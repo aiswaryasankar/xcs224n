@@ -14,11 +14,18 @@ def pad_sents(sents, pad_token):
     @param pad_token (int): padding token
     @returns sents_padded (list[list[str]]): list of sentences where sentences shorter
         than the max length sentence are padded out with the pad_token, such that
-        each sentences in the batch now has equal length.
+        each sentence in the batch now has equal length.
     """
     sents_padded = []
 
     ### YOUR CODE HERE (~6 Lines)
+    maxLen = 0
+    for sent in sents:
+        maxLen = max(maxLen, len(sent))
+
+    for sent in sents:
+        if len(sent) < maxLen:
+            sents_padded.append(sent + [pad_token for i in range(maxLen - len(sent))])
 
     ### END YOUR CODE
 
