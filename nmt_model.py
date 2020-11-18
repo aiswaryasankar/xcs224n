@@ -124,7 +124,7 @@ class NMT(nn.Module):
             Additionally, take the final states of the encoder and project them to obtain initial states for decoder.
 
         @param source_padded (Tensor): Tensor of padded source sentences with shape (src_len, b), where
-                                        b = batch_size, src_len = maximum source sentence length. Note that 
+                                        b = batch_size, src_len = maximum source sentence length. Note that
                                        these have already been sorted in order of longest to shortest sentence.
         @param source_lengths (List[int]): List of actual lengths for each of the source sentences in the batch
         @returns enc_hiddens (Tensor): Tensor of hidden units with shape (b, src_len, h*2), where
@@ -168,16 +168,13 @@ class NMT(nn.Module):
 
         # compute the model embeddings of the source sentences
         X = self.model_embeddings.source(source_padded)
-        X = torch.nn.utils.rnn.pack_padded_sequence(X, lengths=source_lengths)
-        enc_hiddens, (last_hidden, last_cell) = self.encoder(X)
-        enc_hiddens, _ = torch.nn.utils.rnn.pack_packed_sequence(enc_hiddens)[0].transpose(0,1)
-        enc_hiddens = enc_hiddens.transpose(0,1)
-
-        last_hidden = torch.cat((last_hidden[0], last_hidden[1]), 1)
+        enc_hiddens, (last_hidden, last_cell) = self.encoder(
+            torch.nn.utils.rnn.pack_padded_sequence(X, source_lengths))
+        enc_hiddens = torch.nn.utils.rnn.pad_packed_sequence(enc_hiddens, batch_first=True)[0]
+        last_hidden = torch.cat((last_hidden[0, :], last_hidden[1, :]), 1)
         init_decoder_hidden = self.h_projection(last_hidden)
-        last_cell = torch.cat((last_cell[0], last_cell[1]), 1)
+        last_cell = torch.cat((last_cell[0, :], last_cell[1, :]), 1)
         init_decoder_cell = self.c_projection(last_cell)
-
         dec_init_state = (init_decoder_hidden, init_decoder_cell)
 
         ### END YOUR CODE
@@ -194,7 +191,7 @@ class NMT(nn.Module):
                                      b = batch size, src_len = maximum source sentence length.
         @param dec_init_state (tuple(Tensor, Tensor)): Initial state and cell for decoder
         @param target_padded (Tensor): Gold-standard padded target sentences (tgt_len, b), where
-                                       tgt_len = maximum target sentence length, b = batch size. 
+                                       tgt_len = maximum target sentence length, b = batch size.
 
         @returns combined_outputs (Tensor): combined output tensor  (tgt_len, b,  h), where
                                         tgt_len = maximum target sentence length, b = batch_size,  h = hidden size
@@ -222,7 +219,7 @@ class NMT(nn.Module):
         ###         where tgt_len = maximum target sentence length, b = batch size, e = embedding size.
         ###     3. Use the torch.split function to iterate over the time dimension of Y.
         ###         Within the loop, this will give you Y_t of shape (1, b, e) where b = batch size, e = embedding size.
-        ###             - Squeeze Y_t into a tensor of dimension (b, e). 
+        ###             - Squeeze Y_t into a tensor of dimension (b, e).
         ###             - Construct Ybar_t by concatenating Y_t with o_prev.
         ###             - Use the step function to compute the the Decoder's next (cell, state) values
         ###               as well as the new combined output o_t.
@@ -235,7 +232,7 @@ class NMT(nn.Module):
         ### Note:
         ###    - When using the squeeze() function make sure to specify the dimension you want to squeeze
         ###      over. Otherwise, you will remove the batch dimension accidentally, if batch_size = 1.
-        ###   
+        ###
         ### Use the following docs to implement this functionality:
         ###     Zeros Tensor:
         ###         https://pytorch.org/docs/stable/torch.html#torch.zeros
@@ -277,7 +274,7 @@ class NMT(nn.Module):
         @param enc_hiddens_proj (Tensor): Encoder hidden states Tensor, projected from (h * 2) to h. Tensor is with shape (b, src_len, h),
                                     where b = batch size, src_len = maximum source length, h = hidden size.
         @param enc_masks (Tensor): Tensor of sentence masks shape (b, src_len),
-                                    where b = batch size, src_len is maximum source length. 
+                                    where b = batch size, src_len is maximum source length.
 
         @returns dec_state (tuple (Tensor, Tensor)): Tuple of tensors both shape (b, h), where b = batch size, h = hidden size.
                 First tensor is decoder's new hidden state, second tensor is decoder's new cell.
@@ -294,7 +291,7 @@ class NMT(nn.Module):
         ### TODO:
         ###     1. Apply the decoder to `Ybar_t` and `dec_state`to obtain the new dec_state.
         ###     2. Split dec_state into its two parts (dec_hidden, dec_cell)
-        ###     3. Compute the attention scores e_t, a Tensor shape (b, src_len). 
+        ###     3. Compute the attention scores e_t, a Tensor shape (b, src_len).
         ###        Note: b = batch_size, src_len = maximum source length, h = hidden size.
         ###
         ###       Hints:
@@ -315,7 +312,7 @@ class NMT(nn.Module):
         dec_state = self.decoder(Ybar_t, dec_state)
         (dec_hidden, dec_cell) = dec_state
 
-        e_t = enc_hiddens_proj.bmm(dec_hidden.unsquuze(2)).squeeze(2)
+        e_t = enc_hiddens_proj.bmm(dec_hidden.unsqueeze(2)).squeeze(2)
         ### END YOUR CODE
 
         # Set e_t to -inf where enc_masks has 1
@@ -365,9 +362,9 @@ class NMT(nn.Module):
         """ Generate sentence masks for encoder hidden states.
 
         @param enc_hiddens (Tensor): encodings of shape (b, src_len, 2*h), where b = batch size,
-                                     src_len = max source length, h = hidden size. 
+                                     src_len = max source length, h = hidden size.
         @param source_lengths (List[int]): List of actual lengths for each of the sentences in the batch.
-        
+
         @returns enc_masks (Tensor): Tensor of sentence masks of shape (b, src_len),
                                     where src_len = max source length, h = hidden size.
         """
